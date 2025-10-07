@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Toko Sendal — Checkout via WhatsApp</title>
+<style>
+  :root{
+    --accent:#4aa3ff; /* biru muda */
+    --bg:#f3f8ff;
+    --card:#fff;
+    --muted:#666;
+    --radius:10px;
+    --shadow:0 8px 30px rgba(20,20,40,0.06);
+    font-family:system-ui,Segoe UI,Roboto,Arial;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:#111}
+  header{background:var(--accent);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px}
+  header h1{margin:0;font-size:18px}
+  .wrap{max-width:1100px;margin:18px auto;padding:12px;display:grid;grid-template-columns:2fr 1fr;gap:16px}
+  .products{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+  .card{background:var(--card);border-radius:12px;padding:10px;box-shadow:0 6px 18px rgba(20,20,40,0.06)}
+  .card img{width:100%;height:160px;object-fit:cover;border-radius:8px}
+  .title{font-weight:700;margin-top:8px}
+  .price{color:var(--accent);font-weight:800;margin-top:6px}
+  label{display:block;font-size:0.9rem;margin-top:8px}
+  select,input{width:100%;padding:8px;border-radius:8px;border:1px solid #e6eef8;margin-top:6px}
+  button{background:var(--accent);color:#fff;border:none;padding:10px;border-radius:10px;cursor:pointer}
+  .sidebar{position:sticky;top:18px;background:var(--card);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(20,20,40,0.06)}
+  .cart-item{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #f0f4fb}
+  .cart-item img{width:64px;height:64px;object-fit:cover;border-radius:8px}
+  .qty-btn{padding:6px 8px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
+  .total{font-weight:800;margin-top:8px}
+  /* modal */
+  #modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:9999}
+  .modal-box{background:#fff;border-radius:12px;padding:14px;width:520px;max-width:94%}
+  .modal-box h3{margin:0 0 10px 0}
+  .small{font-size:0.9rem;color:var(--muted)}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr} .sidebar{position:static}}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="width:44px;height:44px;border-radius:10px;background:#fff3;display:inline-block"></div>
+  <h1>Toko Sendal — Order Online</h1>
+  <div style="margin-left:auto;font-size:14px;color:#eaf6ff">Tema: Biru Muda • Ukuran: M/L/XL</div>
+</header>
+
+<div class="wrap">
+  <section>
+    <div class="products" id="product-list"></div>
+  </section>
+
+  <aside class="sidebar">
+    <h3>Keranjang</h3>
+    <div id="cart-items" class="small">Keranjang kosong</div>
+    <div class="total">Total: <span id="subtotal">Rp 0</span></div>
+    <div style="margin-top:10px">
+      <button id="btn-checkout">Checkout</button>
+    </div>
+    <div class="small" style="margin-top:10px;color:var(--muted)">
+      Klik Checkout → isi data pengiriman → pesanan akan dikirim ke WhatsApp admin.
+    </div>
+  </aside>
+</div>
+
+<!-- modal -->
+<div id="modal">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Form Pengiriman</h3><button id="close-modal" style="border:none;background:transparent;cursor:pointer">✕</button>
+    </div>
+
+    <div id="modal-order-list" style="max-height:220px;overflow:auto;margin-top:8px"></div>
+
+    <div style="margin-top:10px">
+      <label>Nama penerima</label>
+      <input id="cust-name" placeholder="Nama lengkap">
+      <label>Alamat pengiriman</label>
+      <input id="cust-address" placeholder="Jalan, kecamatan, kota">
+      <label>Nomor HP</label>
+      <input id="cust-phone" placeholder="08xxxxxxxx">
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button id="send-wa" style="flex:1">Kirim pesanan ke WhatsApp</button>
+      </div>
+      <div class="small" style="margin-top:8px;color:var(--muted)">Nomor admin: +62 877-7552-8211</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* CONFIG */
+const WA_ADMIN = "6287775528211"; // admin +62 877-7552-8211
+
+/* PRODUCTS
+If you want to use your real photos, replace img values below with:
+- local file name in same folder (e.g. 'sendal_slop_black.jpg'), OR
+- direct URL to the image (https://...)
+Currently placeholders will show if file not provided.
+*/
+const PRODUCTS = [
+  { id: 1, name: "Sendal Slop (Hitam)", price: 35000, colors:["Hitam"], sizes:["M","L","XL"], img: "WhatsApp Image 2025-10-07 at 16.42.32 (1).JPEG" },
+  { id: 2, name: "Sendal Slop (Pink)", price: 15000, colors:["Pink"], sizes:["M","L","XL"], img: "WhatsApp Image 2025-10-07 at 16.42.54.JPEG" },
+  { id: 3, name: "Sendal Jepit (Hitam)", price: 35000, colors:["Hitam"], sizes:["M","L","XL"], img: "WhatsApp Image 2025-10-07 at 16.42.31.JPEG" },
+  { id: 4, name: "Sendal Slop (Cream)", price: 20000, colors:["Cream"], sizes:["M","L","XL"], img: "WhatsApp Image 2025-10-07 at 16.40.59.JPEG" },
+  { id: 5, name: "Sendal Slop Bolong² (Abu-abu)", price: 15000, colors:["Abu-abu"], sizes:["M","L","XL"], img: "WhatsApp Image 2025-10-07 at 16.42.53.JPEG" },
+  { id: 6, name: "Sendal Slop Formal", price: 30000, colors:["Biru","Ijo","Hitam","Cream","Merah Tua"], sizes:["M","L","XL"], img: "WhatsApp Image 2025-10-07 at 16.40.58.JPEG" }
+];
+
+let cart = [];
+
+/* HELPERS */
+function formatIDR(n){ return 'Rp ' + Number(n).toLocaleString('id-ID'); }
+
+/* RENDER PRODUCTS */
+function renderProducts(){
+  const list = document.getElementById('product-list'); list.innerHTML = '';
+  PRODUCTS.forEach(p => {
+    const card = document.createElement('div'); card.className = 'card';
+    card.innerHTML = `
+      <img src="${p.img}" alt="${p.name}" onerror="this.onerror=null;this.src='C:\Users\MIKROTIK CIREBON\Documents\coding'">
+      <div class="title">${p.name}</div>
+      <div class="price">${formatIDR(p.price)}</div>
+      <label>Ukuran</label>
+      <select id="size-${p.id}">${p.sizes.map(s=>`<option value="${s}">${s}</option>`).join('')}</select>
+      <label>Warna</label>
+      <select id="color-${p.id}">${p.colors.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button style="flex:1" onclick="addToCart(${p.id})">Tambah ke Keranjang</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+/* CART */
+function addToCart(productId){
+  const p = PRODUCTS.find(x=>x.id===productId);
+  const size = document.getElementById(`size-${productId}`).value;
+  const color = document.getElementById(`color-${productId}`).value;
+  const existing = cart.find(i => i.id===productId && i.size===size && i.color===color);
+  if(existing){ existing.qty += 1; }
+  else { cart.push({ id: p.id, name: p.name, price: p.price, img: p.img, size, color, qty: 1 }); }
+  renderCart();
+}
+
+function changeQty(idx, delta){
+  cart[idx].qty += delta;
+  if(cart[idx].qty < 1) cart.splice(idx,1);
+  renderCart();
+}
+
+function renderCart(){
+  const container = document.getElementById('cart-items');
+  const subtotalEl = document.getElementById('subtotal');
+  container.innerHTML = '';
+  if(cart.length === 0){
+    container.textContent = 'Keranjang kosong';
+    subtotalEl.textContent = formatIDR(0);
+    return;
+  }
+  let total = 0;
+  cart.forEach((it, idx) => {
+    total += it.price * it.qty;
+    const div = document.createElement('div'); div.className = 'cart-item';
+    div.innerHTML = `
+      <img src="${it.img}" onerror="this.onerror=null;this.src='https://via.placeholder.com/100x100?text=No+Image'">
+      <div style="flex:1">
+        <div style="font-weight:700">${it.name}</div>
+        <div style="color:var(--muted);font-size:0.9rem">${it.size} • ${it.color}</div>
+        <div style="margin-top:6px">${formatIDR(it.price)} × ${it.qty} = <b>${formatIDR(it.price*it.qty)}</b></div>
+        <div style="margin-top:6px;display:flex;gap:6px">
+          <button class="qty-btn" onclick="changeQty(${idx},-1)">-</button>
+          <button class="qty-btn" onclick="changeQty(${idx},1)">+</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+  subtotalEl.textContent = formatIDR(total);
+}
+
+/* CHECKOUT MODAL */
+const btnCheckout = document.getElementById('btn-checkout');
+const modal = document.getElementById('modal');
+const modalList = document.getElementById('modal-order-list');
+const closeModal = document.getElementById('close-modal');
+const sendWA = document.getElementById('send-wa');
+
+btnCheckout.addEventListener('click', ()=> {
+  if(cart.length === 0) return alert('Keranjang masih kosong. Tambahkan produk terlebih dahulu.');
+  // render cart inside modal
+  modalList.innerHTML = '';
+  cart.forEach(it => {
+    const p = document.createElement('div'); p.style.padding='6px 0';
+    p.innerHTML = `${it.name} — ${it.size} / ${it.color} × ${it.qty} = <b>${formatIDR(it.price*it.qty)}</b>`;
+    modalList.appendChild(p);
+  });
+  document.getElementById('cust-name').value = '';
+  document.getElementById('cust-address').value = '';
+  document.getElementById('cust-phone').value = '';
+  modal.style.display = 'flex';
+});
+
+closeModal.addEventListener('click', ()=> modal.style.display = 'none');
+
+/* SEND TO WHATSAPP */
+sendWA.addEventListener('click', ()=> {
+  const name = document.getElementById('cust-name').value.trim();
+  const address = document.getElementById('cust-address').value.trim();
+  const phone = document.getElementById('cust-phone').value.trim();
+  if(!name || !address || !phone) return alert('Isi nama, alamat, dan nomor HP penerima sebelum mengirim pesanan.');
+  // build message (use plain message then encode)
+  let message = `Halo admin, saya ingin pesan:%0A`;
+  let total = 0;
+  cart.forEach(it => {
+    message += `- ${it.name} (Uk: ${it.size}, Warna: ${it.color}) x${it.qty} = ${formatIDR(it.price*it.qty)}%0A`;
+    total += it.price*it.qty;
+  });
+  message += `%0ATotal: ${formatIDR(total)}%0A%0ANama: ${name}%0AAlamat: ${address}%0ANo HP: ${phone}%0A`;
+  const url = `https://wa.me/${WA_ADMIN}?text=${encodeURIComponent(message)}`;
+  window.open(url, '_blank');
+  // close modal and clear cart (optional)
+  modal.style.display = 'none';
+  cart = [];
+  renderCart();
+});
+
+/* INITIAL RENDER */
+renderProducts();
+renderCart();
+</script>
+
+</body>
+</html>
